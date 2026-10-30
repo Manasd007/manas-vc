@@ -1,0 +1,13 @@
+{
+  "name": "manas-vc",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "smoke": "node scripts/smoke.js",
+    "test": "node --test"
+  }
+}
