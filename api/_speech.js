@@ -1,9 +1,4 @@
-// Rewrites a reply so a text to speech voice pronounces it right: acronyms
-// spelled out, product names said the way Manas says them. Only the spoken
-// copy goes through this; the transcript keeps the original text.
-
 const SAY = [
-  // Names and products
   [/\bNeoFab\.AI\b/g, "Neo Fab A I"],
   [/\bNeoFab\b/g, "Neo Fab"],
   [/\bLegally AI\b/g, "Legally A I"],
@@ -29,10 +24,8 @@ const SAY = [
   [/\bRBAC\b/g, "R back"],
   [/\bDOCX\b/g, "doc X"],
   [/\bRAG\b/g, "rag"],
-  // Metrics
   [/\b[pP](50|90|95|99)\b/g, (_, n) => `p ${{ 50: "fifty", 90: "ninety", 95: "ninety five", 99: "ninety nine" }[n]}`],
   [/(\d)\s?ms\b/g, "$1 milliseconds"],
-  // Acronyms read letter by letter, with an optional plural s
   [/\b(MUJ|RFQ|LLM|API|MCP|PII|SEC|OCR|SQL|UI|AWS|GCP|STT|TTS|ETL|AIML|ML|AI)(s?)\b/g,
     (_, word, plural) => word.split("").join(" ") + (plural ? "s" : "")],
 ];

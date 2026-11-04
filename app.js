@@ -1,12 +1,8 @@
-// Everything the page does: recording with silence detection, asking the
-// server, playing the answer in Manas's voice with a live caption, and the
-// ring around his photo that moves with the voice.
-
 import { runIntro } from "./intro.js";
 
-const SILENCE_MS = 1200;      // stop after this much quiet once speech was heard
-const NO_SPEECH_MS = 8000;    // give up if nothing is said at all
-const MAX_RECORD_MS = 30000;  // hard stop
+const SILENCE_MS = 1200;
+const NO_SPEECH_MS = 8000;
+const MAX_RECORD_MS = 30000;
 const HISTORY_TURNS = 6;
 const REQUEST_TIMEOUT_MS = 40000;
 
@@ -20,7 +16,6 @@ const MSG = {
   generic: "Something went wrong. Try again.",
 };
 
-// What the talk button says, and the status line next to the name.
 const STATUS = {
   idle: "Talk",
   listening: "Done? Tap to send",
@@ -41,21 +36,18 @@ const logEl = $("log"), entriesEl = $("entries"), form = $("ask"), input = $("qu
 
 let state = "idle";
 let history = [];
-let turn = 0;              // bumps on every new question so stale replies are ignored
-let rec = null;            // the active recording, if any
+let turn = 0;
+let rec = null;
 let audioCtx = null;
-let micLevel = 0;          // 0..1 while listening
-let outLevel = 0;          // 0..1 while speaking
-let ttsAvailable = true;   // false once the server says there's no OpenAI voice
-let current = null;        // the answer on screen; it moves to the log when the next one starts
+let micLevel = 0;
+let outLevel = 0;
+let ttsAvailable = true;
+let current = null;
 const introEl = $("intro");
-let introOpen = Boolean(introEl);   // Space and Esc wait until the intro is gone
+let introOpen = Boolean(introEl);
 
-// Answers come back in the language of the question. Hindi ones are written in
-// Devanagari, which is how the backup voice knows which language to speak.
 const langOf = (text) => (/[\u0900-\u097F]/.test(text) ? "hi" : "en");
 
-// New content eases in: a short fade and rise. Skipped for reduced motion.
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function enter(el, { y = 8, scale = 1, dur = 450 } = {}) {
   if (reduceMotion) return;
@@ -65,9 +57,6 @@ function enter(el, { y = 8, scale = 1, dur = 450 } = {}) {
   );
 }
 
-// The photo ring and the mic halo only move with a voice: the mic while
-// listening, the reply while speaking. Eased so they swell and settle instead
-// of jittering, and the loop sleeps once nothing is talking.
 let shownLevel = 0;
 let ringAwake = false;
 function ringLevel() {
@@ -105,7 +94,6 @@ function setState(next) {
 const showError = (text) => { errorEl.textContent = text; enter(errorEl, { y: 4, dur: 300 }); };
 const clearError = () => { errorEl.textContent = ""; };
 
-// The caption shows the answer word by word as it's spoken.
 let captionWords = [];
 function showQuestion(question) {
   captionEl.hidden = false;
@@ -138,7 +126,6 @@ function setCaptionProgress(fraction) {
     w.span.classList.toggle("on", on);
     if (on) last = w.span;
   }
-  // Long answers: keep the spoken part in view inside the panel.
   if (last && last.offsetTop - panelEl.scrollTop > panelEl.clientHeight * 0.7) {
     panelEl.scrollTo({ top: last.offsetTop - panelEl.clientHeight * 0.35, behavior: "smooth" });
   }
@@ -186,7 +173,7 @@ player.preload = "auto";
 let audioUnlocked = false;
 let outAnalyser = null;
 let outBuffer = null;
-let stopPlayback = null;   // ends the current say() call
+let stopPlayback = null;
 
 function ensureAudioContext() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -194,7 +181,6 @@ function ensureAudioContext() {
   audioCtx?.resume?.();
 }
 
-// A tiny silent WAV, played inside the first tap so iPhones allow audio later.
 function silentWav() {
   const rate = 8000, samples = 400, buf = new ArrayBuffer(44 + samples * 2), v = new DataView(buf);
   const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
@@ -218,8 +204,6 @@ function unlockAudio() {
   }
 }
 
-// Route the player through an analyser so the ring moves with the voice. Only
-// once the audio context is running, otherwise Safari would play silence.
 function connectOutputAnalyser() {
   if (outAnalyser || !audioCtx || audioCtx.state !== "running") return;
   try {
@@ -241,11 +225,8 @@ function rmsOf(analyser, buffer) {
   return Math.sqrt(sum / buffer.length);
 }
 
-// Splits on sentence ends, including the Hindi full stop.
 const sentencesOf = (text) => text.replace(/([.!?।])\s+/g, "$1\u0000").split("\u0000").map((s) => s.trim()).filter(Boolean);
 
-// First sentence on its own so the voice starts fast; the rest in chunks the
-// server accepts. All chunks are requested at once and played in order.
 function chunkForSpeech(text) {
   const chunks = [];
   let chunk = "";
@@ -262,8 +243,6 @@ function chunkForSpeech(text) {
   return chunks;
 }
 
-// The server only voices its own replies, so each chunk goes with the whole
-// reply and the signature the chat endpoint gave it.
 async function fetchVoice(text, spoken, sig) {
   if (!ttsAvailable) return null;
   try {
@@ -304,7 +283,6 @@ function playChunk(url, onProgress) {
       if (outAnalyser) {
         outLevel = Math.min(1, rmsOf(outAnalyser, outBuffer) * 5);
       } else {
-        // No analyser (Safari before the context runs): a gentle fake pulse.
         const t = performance.now() / 1000;
         outLevel = player.paused ? 0 : 0.35 + 0.25 * Math.sin(t * 9) * Math.sin(t * 3.7) + 0.1 * Math.random();
       }
@@ -313,8 +291,6 @@ function playChunk(url, onProgress) {
   });
 }
 
-// The browser's own voice, used when the OpenAI voice isn't available. One
-// for English and one for Hindi, preferring Indian male voices.
 const browserVoices = { en: null, hi: null };
 function pickBrowserVoices() {
   if (!("speechSynthesis" in window)) return;
@@ -369,7 +345,6 @@ function browserSay(text, onProgress) {
       pulse = requestAnimationFrame(animate);
     };
     animate();
-    // Safety net for browsers that never fire onend.
     const poll = setInterval(() => {
       if (speechSynthesis.speaking || speechSynthesis.pending) { quietSince = 0; return; }
       quietSince = quietSince || Date.now();
@@ -383,7 +358,6 @@ function stopSpeaking() {
   if ("speechSynthesis" in window) speechSynthesis.cancel();
 }
 
-// Speaks a reply, OpenAI voice first and the browser voice as a backup.
 async function say(spoken, sig, mine) {
   stopSpeaking();
   const chunks = chunkForSpeech(spoken);
@@ -540,12 +514,10 @@ async function startListening() {
   session.timer = setInterval(() => watchLevels(session), 50);
 }
 
-// Silence detection: learn the room's noise level for the first 300 ms, only
-// start the silence timer after real speech, then stop after SILENCE_MS of quiet.
 function watchLevels(session) {
   const elapsed = performance.now() - session.startedAt;
   if (elapsed >= MAX_RECORD_MS) return finishListening(session, "limit");
-  if (!session.analyser) return; // no Web Audio: only the tap or the hard stop ends it
+  if (!session.analyser) return;
 
   const rms = rmsOf(session.analyser, session.buffer);
   session.level = session.level * 0.6 + rms * 0.4;
@@ -563,7 +535,7 @@ function watchLevels(session) {
 
   if (!session.heardSpeech) {
     session.loudFrames = loud ? session.loudFrames + 1 : 0;
-    if (session.loudFrames >= 3) session.heardSpeech = true; // ~150 ms of speech
+    if (session.loudFrames >= 3) session.heardSpeech = true;
     else if (elapsed > NO_SPEECH_MS) finishListening(session, "nothing");
     return;
   }
@@ -647,7 +619,6 @@ form.addEventListener("submit", (e) => {
   ask(question);
 });
 
-// Space to talk, Escape to stop (not while typing or during the intro).
 document.addEventListener("keydown", (e) => {
   if (introOpen || e.target.closest?.("input, textarea")) return;
   if (e.code === "Space" && !e.repeat) {
@@ -658,8 +629,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// The page sits behind the intro, inert, until "Start talking". That tap also
-// counts as the gesture iPhones need before they'll play audio.
 const pageEls = [document.querySelector("header"), document.querySelector("main")];
 if (introEl) {
   pageEls.forEach((el) => { el.inert = true; });

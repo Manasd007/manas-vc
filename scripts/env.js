@@ -1,6 +1,3 @@
-// Loads KEY=value lines from .env.local into process.env (for local scripts only;
-// on Vercel the env vars come from the project settings).
-
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 

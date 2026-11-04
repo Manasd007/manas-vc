@@ -1,23 +1,13 @@
-// POST { message, history } -> { reply, spoken, replySig, spokenSig }
-// `spoken` is the same reply rewritten for the voice (acronyms spelled out).
-// The signatures prove the server wrote them: history turns need `replySig`
-// to be trusted and /api/speak only reads text that has a `spokenSig`.
-// Answers one interview question as Manas. OpenAI first, then Groq's gpt-oss
-// models if OpenAI is missing, slow or failing.
-
 import { PERSONA } from "./persona.js";
 import { config } from "./_config.js";
 import { forSpeech } from "./_speech.js";
 import { json, rateLimiter, isHindi, BUSY, BROKEN, SLOW } from "./_shared.js";
 import { sign, verify, fromOtherSite, leaksPrompt, flagged } from "./_guard.js";
 
-// Said instead of the model's answer when a question is flagged or the answer
-// starts reading out the instructions.
 export const DECLINE = "I'll pass on that one. Happy to talk about my work, my projects, or how I'd handle something on the job.";
 export const NO_PEEKING = "That's the behind the scenes stuff, so I'll keep it to the interview. Ask me about my projects or how I work.";
 const LOST = "Sorry, I lost my train of thought there. Could you ask that again?";
 
-// Hindi versions, used when the question is in Hindi.
 const LINES = {
   en: { decline: DECLINE, noPeeking: NO_PEEKING, lost: LOST },
   hi: {
@@ -29,11 +19,9 @@ const LINES = {
 
 const MAX_MESSAGE_CHARS = 500;
 const MAX_HISTORY = 6;
-const MAX_WORDS = { en: 140, hi: 170 };  // Hindi needs more words for the same answer
+const MAX_WORDS = { en: 140, hi: 170 };
 const limited = rateLimiter(30);
 
-// Phrases the persona prompt bans. Hits are logged, not removed, so the prompt
-// can be tightened if any keep showing up.
 const BANNED = [
   "great question", "absolutely", "certainly", "i'd be happy to", "as an ai",
   "delve", "leverage", "passionate", "journey", "tapestry", "fast-paced world",
@@ -43,17 +31,13 @@ const BANNED = [
 
 const STOCK_OPENER = /^(that's a great question|that is a great question|great question|what a great question|absolutely|certainly|sure|of course)\b[^,.!]*[,.!]+\s*/i;
 
-// Cleans a model reply so it reads well out loud.
 export function sanitize(raw, maxWords = MAX_WORDS.en) {
   let text = String(raw || "");
 
-  // Drop any reasoning block and everything before it.
   text = text.replace(/^[\s\S]*<\/think>/i, "").replace(/<think>[\s\S]*$/i, "");
 
-  // Dashes become commas.
   text = text.replace(/\s*[\u2013\u2014]\s*/g, ", ").replace(/(\S) - (?=\S)/g, "$1, ");
 
-  // Markdown: headings, list markers, emphasis, code ticks.
   text = text
     .split(/\r?\n/)
     .map((line) => line.trim().replace(/^#{1,6}\s+/, "").replace(/^(?:[-*+•]|\d+[.)])\s+/, ""))
@@ -65,10 +49,8 @@ export function sanitize(raw, maxWords = MAX_WORDS.en) {
     .replace(/\*+/g, "")
     .replace(/(^|[\s(])_{1,2}([^_]+?)_{1,2}(?=[\s).,!?;:]|$)/g, "$1$2");
 
-  // Tidy punctuation left behind by the replacements above.
   text = text.replace(/\s+([,.!?;:।])/g, "$1").replace(/,(\s*,)+/g, ",").replace(/,\s*([.!?।])/g, "$1");
 
-  // Stock openers like "Great question!" go, then the first letter is capitalised.
   for (let i = 0; i < 2 && STOCK_OPENER.test(text); i++) {
     text = text.replace(STOCK_OPENER, "");
   }
@@ -79,7 +61,6 @@ export function sanitize(raw, maxWords = MAX_WORDS.en) {
   const flagged = BANNED.filter((w) => lower.includes(w));
   if (flagged.length) console.warn("[chat] banned words in reply:", flagged.join(", "));
 
-  // Cap length at the last full sentence before maxWords. "।" ends Hindi sentences.
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length > maxWords) {
     const cut = words.slice(0, maxWords).join(" ");
@@ -90,9 +71,6 @@ export function sanitize(raw, maxWords = MAX_WORDS.en) {
   return text.replace(/\s{2,}/g, " ").trim();
 }
 
-// History comes from the browser, so anyone can edit it. Earlier questions are
-// kept (they could have been typed anyway), but an answer only counts if the
-// server signed it. That stops fake "you already agreed to..." turns.
 function cleanHistory(history) {
   if (!Array.isArray(history)) return [];
   return history
@@ -107,8 +85,6 @@ function answer(reply) {
   return json({ reply, spoken, replySig: sign("history", reply), spokenSig: sign("speak", spoken) });
 }
 
-// Reasoning models (gpt-5 family, o-series) reject temperature and need room
-// for their thinking tokens.
 const isReasoningModel = (model) => /^(gpt-5|o\d)/.test(model);
 
 function providers() {
@@ -125,7 +101,6 @@ function providers() {
   }
   if (config.groqKey) {
     const groq = { name: "groq", timeout: 12_000, url: "https://api.groq.com/openai/v1/chat/completions", key: config.groqKey };
-    // Reasoning tokens count toward max_completion_tokens on gpt-oss.
     const params = { temperature: 0.8, max_completion_tokens: 900, reasoning_effort: "low", include_reasoning: false };
     list.push({ ...groq, model: config.groqModel, params });
     if (config.groqFallbackModel !== config.groqModel) list.push({ ...groq, model: config.groqFallbackModel, params });
@@ -151,7 +126,6 @@ async function complete(provider, messages) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    // Any failure moves on to the next provider, which has its own key.
     throw new RetryableError(`${label}: HTTP ${res.status} ${detail.slice(0, 300)}`);
   }
 
@@ -191,7 +165,6 @@ export async function POST(request) {
     { role: "user", content: message },
   ];
 
-  // Moderation runs alongside the answer so it adds no wait.
   const moderation = flagged(message);
 
   const errors = [];

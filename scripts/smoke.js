@@ -1,8 +1,3 @@
-// Checks that the API keys in .env.local work. Run: npm run smoke
-// Prints which models each key can use, makes one tiny call per service, and
-// saves voice samples to smoke-output/ so you can hear the options.
-// Never prints the keys themselves.
-
 import { mkdirSync, writeFileSync } from "node:fs";
 import { root } from "./env.js";
 import { config, VOICE_STYLE } from "../api/_config.js";

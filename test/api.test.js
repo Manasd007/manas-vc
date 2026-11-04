@@ -1,5 +1,3 @@
-// Server tests with OpenAI and Groq stubbed out. Run: npm test
-
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
@@ -27,8 +25,6 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.fetch = realFetch; });
 
-// Each response is used for one call, in order. An Error is thrown as a network failure.
-// Moderation checks are answered separately so they don't use up a response.
 function stub(...responses) {
   globalThis.fetch = async (url, init) => {
     if (String(url).endsWith("/moderations")) {
@@ -53,8 +49,6 @@ function post(path, body, headers = {}) {
     body: typeof body === "string" || body instanceof Uint8Array ? body : JSON.stringify(body),
   });
 }
-
-// ---------- sanitize ----------
 
 test("sanitize turns em and en dashes into commas", () => {
   assert.equal(sanitize("I built Conduit \u2014 solo \u2014 in a month."), "I built Conduit, solo, in a month.");
@@ -94,8 +88,6 @@ test("persona has the background, project notes and talking points, and no dashe
   assert.doesNotMatch(PERSONA, /[\u2013\u2014]/);
 });
 
-// ---------- pronunciation ----------
-
 test("forSpeech spells out acronyms and fixes names", () => {
   assert.equal(forSpeech("At NeoFab.AI I sent RFQs and built a RAG knowledge base with FAISS."),
     "At Neo Fab A I I sent R F Qs and built a rag knowledge base with face.");
@@ -105,9 +97,6 @@ test("forSpeech spells out acronyms and fixes names", () => {
   assert.equal(forSpeech("Aim for MAIL and RAGE."), "Aim for MAIL and RAGE.");
 });
 
-// ---------- /api/chat ----------
-
-// An answer turn as the page sends it back, signed the way /api/chat signs it.
 const said = (content) => ({ role: "assistant", content, sig: sign("history", content) });
 
 test("chat asks OpenAI first with the persona and trimmed history", async () => {
@@ -266,9 +255,6 @@ test("chat rate limits one IP after 30 requests", async () => {
   assert.equal(statuses.at(-1), 429);
 });
 
-// ---------- /api/speak ----------
-
-// A chunk of a reply the server signed, as the page sends it.
 const voice = (text, spoken = text) => ({ text, spoken, sig: sign("speak", spoken) });
 
 test("speak streams OpenAI audio with the voice style", async () => {
@@ -328,8 +314,6 @@ test("a reply from chat can be spoken straight away", async () => {
   assert.equal((await speak(post("speak", { text: spoken, spoken, sig: spokenSig }))).status, 200);
 });
 
-// ---------- requests from other sites ----------
-
 test("endpoints refuse requests sent by another site's page", async () => {
   stub();
   const other = { origin: "https://evil.example", host: "voice.example" };
@@ -356,8 +340,6 @@ test("vercel.json sends a strict content security policy", () => {
   assert.equal(headers["X-Content-Type-Options"], "nosniff");
   assert.match(headers["Permissions-Policy"], /microphone=\(self\)/);
 });
-
-// ---------- /api/transcribe ----------
 
 const audio = (bytes, type = "audio/webm;codecs=opus") => post("transcribe", new Uint8Array(bytes), { "Content-Type": type });
 

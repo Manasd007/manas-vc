@@ -1,10 +1,3 @@
-// POST { text, spoken, sig } -> audio/mpeg
-// Reads one chunk of a reply out loud with OpenAI text to speech. Returns 503
-// when no OpenAI key is set, so the page falls back to the browser's voice.
-// Only speaks text the server wrote: `spoken` is the whole reply as /api/chat
-// returned it, `sig` its spokenSig, and `text` must be a piece of it. Otherwise
-// anyone could make the voice say anything.
-
 import { config, VOICE_STYLE, VOICE_STYLE_HI } from "./_config.js";
 import { json, rateLimiter, isHindi, BUSY, BROKEN, SLOW } from "./_shared.js";
 import { verify, fromOtherSite } from "./_guard.js";
@@ -56,7 +49,6 @@ export async function POST(request) {
     return json({ error: BROKEN }, 502);
   }
 
-  // Stream the audio straight through as it's generated.
   return new Response(res.body, {
     headers: { "Content-Type": "audio/mpeg", "Cache-Control": "no-store" },
   });

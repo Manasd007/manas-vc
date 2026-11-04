@@ -1,8 +1,3 @@
-// POST raw audio (audio/webm or audio/mp4) -> { text }
-// OpenAI's gpt-transcribe first, Whisper on Groq as the backup. gpt-transcribe
-// copes much better with Hindi, Hinglish and noisy rooms. No language is set,
-// so a Hindi question comes back in Hindi.
-
 import { config } from "./_config.js";
 import { json, rateLimiter, BUSY, BROKEN, SLOW } from "./_shared.js";
 import { fromOtherSite } from "./_guard.js";
@@ -11,13 +6,10 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const TOO_LONG = "That recording is too long. Keep questions under 30 seconds.";
 const limited = rateLimiter(30);
 
-// Speech models sometimes "hear" these in silence or background noise.
 const PHANTOM = /^(thank you\.?|thanks for watching!?|you|bye\.?|\.+|धन्यवाद[।.!]?|शुक्रिया[।.!]?)$/i;
 
-// Only the names it tends to mishear. Longer hints made it invent questions.
 const NAMES = "NeoFab, Conduit, Legally AI, FinSight, Waypoint, RAG";
 
-// The models work out the format from the file name, so it has to match the audio.
 function fileNameFor(type) {
   if (type.includes("webm")) return "question.webm";
   if (type.includes("mp4") || type.includes("m4a") || type.includes("aac")) return "question.mp4";
@@ -33,7 +25,6 @@ function providers() {
     list.push({ name: "openai", url: "https://api.openai.com/v1/audio/transcriptions", key: config.openaiKey, model: config.sttModel, prompt: NAMES });
   }
   if (config.groqKey) {
-    // No hint for Whisper: with one it sometimes turned noise into the names.
     list.push({ name: "groq", url: "https://api.groq.com/openai/v1/audio/transcriptions", key: config.groqKey, model: config.groqSttModel });
   }
   return list;
